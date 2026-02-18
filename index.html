@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>متجري</title>
+
+<style>
+body{font-family:Tajawal;background:#f5f5f5;margin:0;direction:rtl}
+header{background:#ff6b00;color:#fff;padding:15px;text-align:center}
+.products{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:10px}
+.card{background:#fff;padding:10px;border-radius:10px;text-align:center}
+.card img{width:100%;height:120px;object-fit:cover;border-radius:8px}
+.cart{
+position:fixed;bottom:20px;left:20px;
+background:#ff6b00;color:white;
+padding:12px;border-radius:50px;
+cursor:pointer;
+}
+</style>
+</head>
+
+<body>
+
+<header>🛒 متجر التوصيل</header>
+
+<div class="products" id="products"></div>
+
+<div class="cart" onclick="sendOrder()">
+🛒 <span id="count">0</span>
+</div>
+
+<script>
+
+const TOKEN="PUT_TOKEN";
+const REPO="USERNAME/REPO";
+
+let cart=[];
+
+/* تحميل المنتجات */
+async function loadProducts(){
+let res=await fetch("products.json");
+let items=await res.json();
+
+products.innerHTML="";
+
+items.forEach(p=>{
+products.innerHTML+=`
+<div class="card">
+<img src="${p.img}">
+<h4>${p.name}</h4>
+<p>${p.price}$</p>
+<button onclick="addToCart('${p.name}',${p.price})">
+إضافة
+</button>
+</div>`;
+});
+}
+loadProducts();
+
+/* السلة */
+function addToCart(name,price){
+cart.push({product:name,price});
+count.innerText=cart.length;
+}
+
+/* الموقع */
+function getLocation(){
+return new Promise(resolve=>{
+navigator.geolocation.getCurrentPosition(pos=>{
+resolve({
+lat:pos.coords.latitude,
+lng:pos.coords.longitude
+});
+});
+});
+}
+
+/* إرسال الطلب */
+async function sendOrder(){
+
+if(cart.length==0){
+alert("السلة فارغة");
+return;
+}
+
+alert("سيتم تحديد موقعك للتوصيل 🚚");
+
+let location=await getLocation();
+
+let order={
+id:Date.now(),
+items:cart,
+status:"pending",
+time:new Date().toLocaleString(),
+location:location
+};
+
+let res=await fetch(
+`https://api.github.com/repos/${REPO}/contents/orders.json`,
+{headers:{Authorization:"token "+TOKEN}}
+);
+
+let data=await res.json();
+let orders=JSON.parse(atob(data.content));
+
+orders.push(order);
+
+await fetch(
+`https://api.github.com/repos/${REPO}/contents/orders.json`,
+{
+method:"PUT",
+headers:{
+Authorization:"token "+TOKEN,
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+message:"new order",
+content:btoa(JSON.stringify(orders,null,2)),
+sha:data.sha
+})
+});
+
+alert("✅ تم إرسال الطلب\nرقم الطلب: "+order.id);
+
+cart=[];
+count.innerText=0;
+}
+
+</script>
+
+</body>
+</html>
